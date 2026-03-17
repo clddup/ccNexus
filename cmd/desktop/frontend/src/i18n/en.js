@@ -211,6 +211,8 @@ export default {
         proxyUrl: 'Proxy URL',
         proxyUrlPlaceholder: 'e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080',
         proxyHelp: 'Configure HTTP/SOCKS5 proxy, leave empty for direct connection',
+        skipTlsVerify: 'Skip TLS Verification',
+        skipTlsVerifyHelp: 'Disable TLS certificate verification (useful for self-signed certificates or proxy environments)',
         claudeNotification: 'Notification Method',
         notificationOptions: {
             disabled: 'Disabled',

@@ -451,6 +451,13 @@ export function initUI() {
                         <label>${t('modal.remark')}</label>
                         <input type="text" id="endpointRemark" placeholder="${t('modal.remarkHelp')}">
                     </div>
+                    <div class="form-group">
+                        <label>Extra Body (JSON)</label>
+                        <textarea id="endpointExtraBody" rows="3" placeholder='{"max_completion_tokens": null}' style="width: 100%; font-family: monospace; font-size: 13px; resize: vertical; min-height: 60px;"></textarea>
+                        <p style="color: #666; font-size: 12px; margin-top: 5px;">
+                            输入 JSON，转发时合并到请求体。值为 null 表示删除该字段，例如 {"max_completion_tokens": null}
+                        </p>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" id="manageTokenPoolBtn" style="display: none;" onclick="window.openEndpointTokenPoolFromModal()">🪪 ${t('modal.manageTokenPool')}</button>
@@ -753,6 +760,18 @@ export function initUI() {
                         <input type="text" id="settingsProxyUrl" placeholder="${t('settings.proxyUrlPlaceholder')}">
                         <p style="color: #666; font-size: 12px; margin-top: 5px;">
                             ${t('settings.proxyHelp')}
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="margin-bottom: 0;">${t('settings.skipTlsVerify')}</label>
+                            <label class="toggle-switch" style="width: 40px; height: 20px;">
+                                <input type="checkbox" id="settingsSkipTlsVerify">
+                                <span class="toggle-slider" style="border-radius: 20px;"></span>
+                            </label>
+                        </div>
+                        <p style="color: #666; font-size: 12px; margin-top: 5px;">
+                            ${t('settings.skipTlsVerifyHelp')}
                         </p>
                     </div>
                     <div class="form-group">

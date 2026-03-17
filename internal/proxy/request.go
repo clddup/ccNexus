@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -349,8 +350,47 @@ func overrideModelInPayload(payload []byte, model string) []byte {
 	return updated
 }
 
+// mergeExtraBody merges user-provided extra JSON into the request body
+// Fields set to null in extraBody will be DELETED from the body
+func mergeExtraBody(payload []byte, extraBody string) []byte {
+	trimmed := strings.TrimSpace(string(payload))
+	if trimmed == "" || strings.HasPrefix(trimmed, "[") {
+		return payload
+	}
+
+	extraBody = strings.TrimSpace(extraBody)
+	if extraBody == "" {
+		return payload
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return payload
+	}
+
+	var extra map[string]interface{}
+	if err := json.Unmarshal([]byte(extraBody), &extra); err != nil {
+		return payload
+	}
+
+	// Merge extra fields: null means delete, others override
+	for k, v := range extra {
+		if v == nil {
+			delete(body, k)
+		} else {
+			body[k] = v
+		}
+	}
+
+	updated, err := json.Marshal(body)
+	if err != nil {
+		return payload
+	}
+	return updated
+}
+
 // sendRequest sends the HTTP request and returns the response
-func sendRequest(ctx context.Context, proxyReq *http.Request, httpClient *http.Client, cfg *config.Config) (*http.Response, error) {
+func sendRequest(ctx context.Context, proxyReq *http.Request, httpClient *http.Client, cfg *config.Config, skipTLSVerify bool) (*http.Response, error) {
 	proxyReq = proxyReq.WithContext(ctx)
 
 	proxyURL := resolveProxyURLForRequest(cfg, proxyReq.URL)
@@ -366,6 +406,9 @@ func sendRequest(ctx context.Context, proxyReq *http.Request, httpClient *http.C
 			logger.Warn("Failed to create proxy transport: %v, using direct connection", err)
 			clientWithProxy.Transport = httpClient.Transport
 		} else {
+			if skipTLSVerify {
+				transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+			}
 			clientWithProxy.Transport = transport
 		}
 

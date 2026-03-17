@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,6 +38,9 @@ func (e *EndpointService) createHTTPClient(timeout time.Duration, targetURL stri
 			WriteBufferSize:        128 * 1024, // 128KB write buffer
 			ReadBufferSize:         128 * 1024, // 128KB read buffer
 			MaxResponseHeaderBytes: 64 * 1024,  // 64KB max response headers
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: e.config.GetSkipTLSVerify(),
+			},
 		},
 	}
 
@@ -136,7 +140,7 @@ func (e *EndpointService) resolveEndpointAPIKey(endpoint config.Endpoint) (strin
 }
 
 // AddEndpoint adds a new endpoint
-func (e *EndpointService) AddEndpoint(name, apiUrl, apiKey, authMode, transformer, model, remark string) error {
+func (e *EndpointService) AddEndpoint(name, apiUrl, apiKey, authMode, transformer, model, remark, extraBody string) error {
 	endpoints := e.config.GetEndpoints()
 	for _, ep := range endpoints {
 		if ep.Name == name {
@@ -163,6 +167,7 @@ func (e *EndpointService) AddEndpoint(name, apiUrl, apiKey, authMode, transforme
 		Transformer: transformer,
 		Model:       model,
 		Remark:      remark,
+		ExtraBody:   extraBody,
 	}
 	config.ApplyEndpointAuthModeRules(&newEndpoint)
 	endpoints = append(endpoints, newEndpoint)
@@ -227,7 +232,7 @@ func (e *EndpointService) RemoveEndpoint(index int) error {
 }
 
 // UpdateEndpoint updates an endpoint by index
-func (e *EndpointService) UpdateEndpoint(index int, name, apiUrl, apiKey, authMode, transformer, model, remark string) error {
+func (e *EndpointService) UpdateEndpoint(index int, name, apiUrl, apiKey, authMode, transformer, model, remark, extraBody string) error {
 	endpoints := e.config.GetEndpoints()
 
 	if index < 0 || index >= len(endpoints) {
@@ -265,6 +270,7 @@ func (e *EndpointService) UpdateEndpoint(index int, name, apiUrl, apiKey, authMo
 		Transformer: transformer,
 		Model:       model,
 		Remark:      remark,
+		ExtraBody:   extraBody,
 	}
 	config.ApplyEndpointAuthModeRules(&updatedEndpoint)
 	endpoints[index] = updatedEndpoint

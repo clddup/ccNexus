@@ -90,6 +90,8 @@ func ClaudeReqToOpenAI(claudeReq []byte, model string) ([]byte, error) {
 				openaiMsg := transformer.OpenAIMessage{Role: msg.Role}
 				if len(textParts) > 0 {
 					openaiMsg.Content = strings.Join(textParts, "")
+				} else {
+					openaiMsg.Content = ""
 				}
 				if len(toolCalls) > 0 {
 					openaiMsg.ToolCalls = toolCalls
@@ -191,11 +193,42 @@ func OpenAIReqToClaude(openaiReq []byte, model string) ([]byte, error) {
 	var systemPrompt string
 	var messages []map[string]interface{}
 
-	for _, msg := range req.Messages {
+	for i := 0; i < len(req.Messages); i++ {
+		msg := req.Messages[i]
+
 		if msg.Role == "system" {
 			if content, ok := msg.Content.(string); ok {
 				systemPrompt += content + "\n"
 			}
+			continue
+		}
+
+		// Handle tool messages - combine consecutive ones into a single user message
+		if msg.Role == "tool" {
+			var toolResultBlocks []map[string]interface{}
+			
+			// Process current tool message
+			toolResultBlocks = append(toolResultBlocks, map[string]interface{}{
+				"type": "tool_result", 
+				"tool_use_id": msg.ToolCallID, 
+				"content": msg.Content,
+			})
+			
+			// Look ahead for consecutive tool messages
+			for i+1 < len(req.Messages) && req.Messages[i+1].Role == "tool" {
+				i++
+				nextMsg := req.Messages[i]
+				toolResultBlocks = append(toolResultBlocks, map[string]interface{}{
+					"type": "tool_result", 
+					"tool_use_id": nextMsg.ToolCallID, 
+					"content": nextMsg.Content,
+				})
+			}
+			
+			messages = append(messages, map[string]interface{}{
+				"role": "user",
+				"content": toolResultBlocks,
+			})
 			continue
 		}
 
@@ -228,16 +261,39 @@ func OpenAIReqToClaude(openaiReq []byte, model string) ([]byte, error) {
 			claudeMsg["content"] = blocks
 		}
 
-		// Handle tool message
-		if msg.Role == "tool" {
-			claudeMsg["role"] = "user"
-			claudeMsg["content"] = []map[string]interface{}{
-				{"type": "tool_result", "tool_use_id": msg.ToolCallID, "content": msg.Content},
-			}
-		}
-
 		messages = append(messages, claudeMsg)
 	}
+
+	// Claude API requires alternating user/assistant messages.
+	// We need to merge consecutive messages of the same role.
+	var mergedMessages []map[string]interface{}
+	for _, msg := range messages {
+		if len(mergedMessages) > 0 && mergedMessages[len(mergedMessages)-1]["role"] == msg["role"] {
+			lastMsg := mergedMessages[len(mergedMessages)-1]
+			
+			// Convert both contents to arrays if they aren't already
+			var lastContent []map[string]interface{}
+			switch c := lastMsg["content"].(type) {
+			case string:
+				lastContent = []map[string]interface{}{{"type": "text", "text": c}}
+			case []map[string]interface{}:
+				lastContent = c
+			}
+			
+			var newContent []map[string]interface{}
+			switch c := msg["content"].(type) {
+			case string:
+				newContent = []map[string]interface{}{{"type": "text", "text": c}}
+			case []map[string]interface{}:
+				newContent = c
+			}
+			
+			lastMsg["content"] = append(lastContent, newContent...)
+		} else {
+			mergedMessages = append(mergedMessages, msg)
+		}
+	}
+	messages = mergedMessages
 
 	if systemPrompt != "" {
 		claudeReq["system"] = strings.TrimSpace(systemPrompt)

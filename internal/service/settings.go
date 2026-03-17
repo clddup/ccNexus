@@ -347,6 +347,7 @@ type SettingsData struct {
 	AutoDarkTheme             string `json:"autoDarkTheme"`
 	ClaudeNotificationEnabled bool   `json:"claudeNotificationEnabled"`
 	ClaudeNotificationType    string `json:"claudeNotificationType"`
+	SkipTLSVerify             bool   `json:"skipTlsVerify"`
 }
 
 // SaveSettings saves all settings in a single operation to avoid database lock issues
@@ -399,6 +400,8 @@ func (s *SettingsService) SaveSettings(settingsJSON string) error {
 		return fmt.Errorf("invalid notification type: %s", settings.ClaudeNotificationType)
 	}
 	s.config.UpdateClaudeNotification(settings.ClaudeNotificationEnabled, settings.ClaudeNotificationType)
+
+	s.config.SetSkipTLSVerify(settings.SkipTLSVerify)
 
 	// Save to storage only once
 	if s.storage != nil {

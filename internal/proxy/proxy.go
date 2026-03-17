@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,6 +42,7 @@ type Proxy struct {
 	mu                sync.RWMutex
 	server            *http.Server
 	httpClient        *http.Client                  // Reusable HTTP client with connection pool
+	insecureHttpClient *http.Client                 // Reusable HTTP client ignoring TLS certificates
 	activeRequests    map[string]bool               // tracks active requests by endpoint name
 	activeRequestsMu  sync.RWMutex                  // protects activeRequests map
 	endpointCtx       map[string]context.Context    // context per endpoint for cancellation
@@ -70,13 +72,22 @@ func New(cfg *config.Config, statsStorage StatsStorage, sqliteStorage *storage.S
 		},
 	}
 
+	insecureTransport := httpClient.Transport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	insecureHttpClient := &http.Client{
+		Timeout:   httpClient.Timeout,
+		Transport: insecureTransport,
+	}
+
 	return &Proxy{
-		config:         cfg,
-		storage:        sqliteStorage,
-		stats:          stats,
-		currentIndex:   0,
-		httpClient:     httpClient,
-		activeRequests: make(map[string]bool),
+		config:             cfg,
+		storage:            sqliteStorage,
+		stats:              stats,
+		currentIndex:       0,
+		httpClient:         httpClient,
+		insecureHttpClient: insecureHttpClient,
+		activeRequests:     make(map[string]bool),
 		endpointCtx:    make(map[string]context.Context),
 		endpointCancel: make(map[string]context.CancelFunc),
 	}
@@ -451,6 +462,11 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request) {
 			transformedBody = overrideModelInPayload(transformedBody, endpoint.Model)
 		}
 
+		// Merge extra body JSON when configured
+		if strings.TrimSpace(endpoint.ExtraBody) != "" {
+			transformedBody = mergeExtraBody(transformedBody, endpoint.ExtraBody)
+		}
+
 		modelName := strings.TrimSpace(streamReq.Model)
 		if modelName == "" || (authMode == config.AuthModeCodexTokenPool && strings.TrimSpace(endpoint.Model) != "") {
 			modelName = endpoint.Model
@@ -495,7 +511,12 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctx := p.getEndpointContext(endpoint.Name)
-		resp, err := sendRequest(ctx, proxyReq, p.httpClient, p.config)
+		clientToUse := p.httpClient
+		if p.config.GetSkipTLSVerify() {
+			clientToUse = p.insecureHttpClient
+		}
+
+		resp, err := sendRequest(ctx, proxyReq, clientToUse, p.config, p.config.GetSkipTLSVerify())
 		if err != nil {
 			logger.Error("[%s] Request failed: %v", endpoint.Name, err)
 			if isTransientNetworkError(err) {

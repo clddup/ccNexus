@@ -211,6 +211,8 @@ export default {
         proxyUrl: '代理地址',
         proxyUrlPlaceholder: '例如：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080',
         proxyHelp: '配置 HTTP/SOCKS5 代理，留空则直连',
+        skipTlsVerify: '跳过 TLS 证书验证',
+        skipTlsVerifyHelp: '开启后将不验证 TLS 证书，适用于自签名证书或代理环境',
         claudeNotification: '通知方式',
         notificationOptions: {
             disabled: '关闭通知',

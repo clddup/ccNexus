@@ -192,6 +192,8 @@ export function showAddEndpointModal() {
     document.getElementById('endpointTransformer').value = 'claude';
     document.getElementById('endpointModel').value = '';
     document.getElementById('endpointRemark').value = '';
+    document.getElementById('endpointExtraBody').value = '';
+    document.getElementById('endpointExtraBody').value = '';
     handleAuthModeChange();
     updateManageTokenPoolButton();
     handleTransformerChange();
@@ -214,6 +216,8 @@ export async function editEndpoint(index) {
     document.getElementById('endpointTransformer').value = ep.transformer || 'claude';
     document.getElementById('endpointModel').value = ep.model || '';
     document.getElementById('endpointRemark').value = ep.remark || '';
+    document.getElementById('endpointExtraBody').value = ep.extraBody || '';
+    document.getElementById('endpointExtraBody').value = ep.extraBody || '';
 
     handleAuthModeChange();
     updateManageTokenPoolButton();
@@ -242,6 +246,7 @@ export async function saveEndpoint() {
 	let transformer = document.getElementById('endpointTransformer').value;
     const model = document.getElementById('endpointModel').value.trim();
     const remark = document.getElementById('endpointRemark').value.trim();
+    const extraBody = document.getElementById('endpointExtraBody').value.trim();
     const isCodexTokenPool = isCodexTokenPoolMode(authMode);
 
     if (isCodexTokenPool) {
@@ -275,9 +280,9 @@ export async function saveEndpoint() {
 
     try {
         if (currentEditIndex === -1) {
-            await addEndpoint(name, url, key, authMode, transformer, model, remark);
+            await addEndpoint(name, url, key, authMode, transformer, model, remark, extraBody);
         } else {
-            await updateEndpoint(currentEditIndex, name, url, key, authMode, transformer, model, remark);
+            await updateEndpoint(currentEditIndex, name, url, key, authMode, transformer, model, remark, extraBody);
         }
 
         closeModal();

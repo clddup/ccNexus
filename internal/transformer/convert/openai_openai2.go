@@ -104,7 +104,7 @@ func OpenAI2ReqToOpenAI(openai2Req []byte, model string) ([]byte, error) {
 			case "message":
 				// Flush pending tool calls
 				if len(pendingToolCalls) > 0 {
-					messages = append(messages, transformer.OpenAIMessage{Role: "assistant", ToolCalls: pendingToolCalls})
+					messages = append(messages, transformer.OpenAIMessage{Role: "assistant", Content: "", ToolCalls: pendingToolCalls})
 					pendingToolCalls = nil
 				}
 				role, _ := itemMap["role"].(string)
@@ -127,7 +127,7 @@ func OpenAI2ReqToOpenAI(openai2Req []byte, model string) ([]byte, error) {
 			case "function_call_output":
 				// Flush pending tool calls first
 				if len(pendingToolCalls) > 0 {
-					messages = append(messages, transformer.OpenAIMessage{Role: "assistant", ToolCalls: pendingToolCalls})
+					messages = append(messages, transformer.OpenAIMessage{Role: "assistant", Content: "", ToolCalls: pendingToolCalls})
 					pendingToolCalls = nil
 				}
 				callID, _ := itemMap["call_id"].(string)
@@ -138,7 +138,7 @@ func OpenAI2ReqToOpenAI(openai2Req []byte, model string) ([]byte, error) {
 
 		// Flush remaining
 		if len(pendingToolCalls) > 0 {
-			messages = append(messages, transformer.OpenAIMessage{Role: "assistant", ToolCalls: pendingToolCalls})
+			messages = append(messages, transformer.OpenAIMessage{Role: "assistant", Content: "", ToolCalls: pendingToolCalls})
 		}
 	}
 

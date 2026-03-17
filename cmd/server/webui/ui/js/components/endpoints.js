@@ -365,6 +365,7 @@ class Endpoints {
                                 <label class="form-label">Remark</label>
                                 <textarea class="form-textarea" name="remark">${endpoint ? this.escapeHtml(endpoint.remark || '') : ''}</textarea>
                             </div>
+
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" class="form-checkbox" name="enabled" ${endpoint?.enabled !== false ? 'checked' : ''}>

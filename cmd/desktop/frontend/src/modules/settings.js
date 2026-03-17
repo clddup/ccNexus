@@ -222,6 +222,13 @@ async function loadCurrentSettings() {
         if (notificationTypeSelect) {
             notificationTypeSelect.value = claudeNotificationType;
         }
+
+        // Load Skip TLS Verify
+        const skipTlsVerify = config.skipTlsVerify || false;
+        const skipTlsVerifyCheckbox = document.getElementById('settingsSkipTlsVerify');
+        if (skipTlsVerifyCheckbox) {
+            skipTlsVerifyCheckbox.checked = skipTlsVerify;
+        }
     } catch (error) {
         console.error('Failed to load settings:', error);
     }
@@ -325,7 +332,8 @@ export async function saveSettings() {
             theme: theme,
             themeAuto: themeAuto,
             claudeNotificationEnabled: claudeNotificationEnabled,
-            claudeNotificationType: claudeNotificationType
+            claudeNotificationType: claudeNotificationType,
+            skipTlsVerify: document.getElementById('settingsSkipTlsVerify').checked
         };
         await window.go.main.App.SaveSettings(JSON.stringify(settings));
 

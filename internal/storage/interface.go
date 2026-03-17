@@ -12,6 +12,8 @@ type Endpoint struct {
 	Transformer string    `json:"transformer"`
 	Model       string    `json:"model"`
 	Remark      string    `json:"remark"`
+	ExtraBody   string    `json:"extraBody"`
+	SkipTLSVerify bool      `json:"skipTlsVerify"`
 	SortOrder   int       `json:"sortOrder"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`

@@ -101,6 +101,7 @@ type Endpoint struct {
 	Transformer string `json:"transformer,omitempty"` // Transformer type: claude, openai, gemini, deepseek
 	Model       string `json:"model,omitempty"`       // Target model name for non-Claude APIs
 	Remark      string `json:"remark,omitempty"`      // Optional remark for the endpoint
+	ExtraBody   string `json:"extraBody,omitempty"`   // Extra JSON to merge into request body
 }
 
 // WebDAVConfig represents WebDAV synchronization configuration
@@ -178,6 +179,7 @@ type Config struct {
 	Terminal                  *TerminalConfig `json:"terminal,omitempty"`            // Terminal launcher config
 	Proxy                     *ProxyConfig    `json:"proxy,omitempty"`               // HTTP proxy config
 	CodexProxy                *ProxyConfig    `json:"codexProxy,omitempty"`          // Codex dedicated proxy config
+	SkipTLSVerify             bool            `json:"skipTlsVerify"`                 // Global setting to disable TLS verification
 	mu                        sync.RWMutex
 }
 
@@ -282,6 +284,20 @@ func (c *Config) UpdatePort(port int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Port = port
+}
+
+// GetSkipTLSVerify gets the global TLS validation skip setting
+func (c *Config) GetSkipTLSVerify() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.SkipTLSVerify
+}
+
+// SetSkipTLSVerify sets the global TLS validation skip setting
+func (c *Config) SetSkipTLSVerify(skip bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.SkipTLSVerify = skip
 }
 
 // UpdateLogLevel updates the log level (thread-safe)
@@ -526,6 +542,8 @@ type StorageEndpoint struct {
 	Transformer string
 	Model       string
 	Remark      string
+	ExtraBody   string
+	SkipTLSVerify bool
 	SortOrder   int
 }
 
@@ -551,6 +569,7 @@ func LoadFromStorage(storage StorageAdapter) (*Config, error) {
 			Transformer: ep.Transformer,
 			Model:       ep.Model,
 			Remark:      ep.Remark,
+			ExtraBody:   ep.ExtraBody,
 		}
 		if endpoint.Transformer == "" {
 			endpoint.Transformer = "claude"
@@ -780,6 +799,7 @@ func (c *Config) SaveToStorage(storage StorageAdapter) error {
 			Transformer: ep.Transformer,
 			Model:       ep.Model,
 			Remark:      ep.Remark,
+			ExtraBody:   ep.ExtraBody,
 		}
 		if normalizedEndpoint.Transformer == "" {
 			normalizedEndpoint.Transformer = "claude"
@@ -792,6 +812,7 @@ func (c *Config) SaveToStorage(storage StorageAdapter) error {
 		endpoint.Transformer = normalizedEndpoint.Transformer
 		endpoint.Model = normalizedEndpoint.Model
 		endpoint.Remark = normalizedEndpoint.Remark
+		endpoint.ExtraBody = normalizedEndpoint.ExtraBody
 		endpoint.SortOrder = i
 
 		if existingNames[ep.Name] {
