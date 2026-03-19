@@ -24,6 +24,8 @@ import (
 
 // createHTTPClient creates an HTTP client with optional proxy support
 func (e *EndpointService) createHTTPClient(timeout time.Duration, targetURL string) *http.Client {
+	skipTLSVerify := e.config.GetSkipTLSVerify()
+
 	// Always create client with proper transport configuration
 	// Enhanced for large SSE streaming and HTTP/2 support
 	client := &http.Client{
@@ -39,7 +41,7 @@ func (e *EndpointService) createHTTPClient(timeout time.Duration, targetURL stri
 			ReadBufferSize:         128 * 1024, // 128KB read buffer
 			MaxResponseHeaderBytes: 64 * 1024,  // 64KB max response headers
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: e.config.GetSkipTLSVerify(),
+				InsecureSkipVerify: skipTLSVerify,
 			},
 		},
 	}
@@ -49,6 +51,9 @@ func (e *EndpointService) createHTTPClient(timeout time.Duration, targetURL stri
 	if strings.TrimSpace(proxyURL) != "" {
 		logger.Debug("Using proxy for request: %s", proxyURL)
 		if transport, err := proxy.CreateProxyTransport(proxyURL); err == nil {
+			transport.TLSClientConfig = &tls.Config{
+				InsecureSkipVerify: skipTLSVerify,
+			}
 			client.Transport = transport
 		} else {
 			logger.Warn("Failed to create proxy transport: %v, using direct connection", err)

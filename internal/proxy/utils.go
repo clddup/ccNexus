@@ -24,7 +24,9 @@ func shouldRetry(statusCode int) bool {
 		statusCode != http.StatusUnauthorized
 }
 
-// cleanIncompleteToolCalls removes incomplete tool_use blocks from request
+// cleanIncompleteToolCalls removes incomplete tool_use blocks and fixes orphaned
+// OpenAI-format tool_calls (assistant messages with tool_calls that have no
+// matching tool response messages) from request.
 func cleanIncompleteToolCalls(bodyBytes []byte) ([]byte, error) {
 	var req map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
@@ -36,7 +38,9 @@ func cleanIncompleteToolCalls(bodyBytes []byte) ([]byte, error) {
 		return bodyBytes, nil
 	}
 
-	hasIncomplete := false
+	modified := false
+
+	// Pass 1: Clean incomplete Claude-format tool_use blocks (no input)
 	for i := len(messages) - 1; i >= 0; i-- {
 		msg, ok := messages[i].(map[string]interface{})
 		if !ok {
@@ -54,6 +58,7 @@ func cleanIncompleteToolCalls(bodyBytes []byte) ([]byte, error) {
 		}
 
 		var cleanedContent []interface{}
+		hasIncomplete := false
 		for _, block := range content {
 			blockMap, ok := block.(map[string]interface{})
 			if !ok {
@@ -73,6 +78,7 @@ func cleanIncompleteToolCalls(bodyBytes []byte) ([]byte, error) {
 		}
 
 		if hasIncomplete {
+			modified = true
 			if len(cleanedContent) == 0 {
 				messages = append(messages[:i], messages[i+1:]...)
 			} else {
@@ -82,11 +88,114 @@ func cleanIncompleteToolCalls(bodyBytes []byte) ([]byte, error) {
 		break
 	}
 
-	if !hasIncomplete {
+	// Pass 2: Fix orphaned OpenAI-format tool_calls
+	// Collect all tool_call_ids that have a matching "tool" role response
+	respondedIDs := make(map[string]bool)
+	for _, m := range messages {
+		msg, ok := m.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := msg["role"].(string)
+		if role == "tool" {
+			if callID, ok := msg["tool_call_id"].(string); ok && callID != "" {
+				respondedIDs[callID] = true
+			}
+		}
+	}
+
+	// Find assistant messages with tool_calls that have orphaned IDs
+	var newMessages []interface{}
+	for i, m := range messages {
+		msg, ok := m.(map[string]interface{})
+		if !ok {
+			newMessages = append(newMessages, m)
+			continue
+		}
+
+		role, _ := msg["role"].(string)
+		if role != "assistant" {
+			newMessages = append(newMessages, m)
+			continue
+		}
+
+		toolCalls, hasTCs := msg["tool_calls"].([]interface{})
+		if !hasTCs || len(toolCalls) == 0 {
+			newMessages = append(newMessages, m)
+			continue
+		}
+
+		// Check which tool_call IDs are orphaned (no matching tool response)
+		var orphanedIDs []string
+		var keptToolCalls []interface{}
+		for _, tc := range toolCalls {
+			tcMap, ok := tc.(map[string]interface{})
+			if !ok {
+				keptToolCalls = append(keptToolCalls, tc)
+				continue
+			}
+			callID, _ := tcMap["id"].(string)
+			if callID == "" || respondedIDs[callID] {
+				keptToolCalls = append(keptToolCalls, tc)
+			} else {
+				orphanedIDs = append(orphanedIDs, callID)
+			}
+		}
+
+		if len(orphanedIDs) == 0 {
+			newMessages = append(newMessages, m)
+			continue
+		}
+
+		modified = true
+
+		// Check if this is the last assistant message with tool_calls
+		isLast := true
+		for j := i + 1; j < len(messages); j++ {
+			laterMsg, ok := messages[j].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if laterRole, _ := laterMsg["role"].(string); laterRole == "assistant" {
+				if _, has := laterMsg["tool_calls"]; has {
+					isLast = false
+					break
+				}
+			}
+		}
+
+		if isLast {
+			// Last assistant message: remove orphaned tool_calls
+			logger.Debug("Removing %d orphaned tool_calls from last assistant message", len(orphanedIDs))
+			if len(keptToolCalls) > 0 {
+				msg["tool_calls"] = keptToolCalls
+			} else {
+				delete(msg, "tool_calls")
+				// Ensure content is not empty for the message to be valid
+				if msg["content"] == nil || msg["content"] == "" {
+					msg["content"] = ""
+				}
+			}
+			newMessages = append(newMessages, msg)
+		} else {
+			// Mid-conversation: keep all tool_calls but insert placeholder tool responses
+			newMessages = append(newMessages, msg)
+			for _, orphanID := range orphanedIDs {
+				logger.Debug("Inserting placeholder tool response for orphaned tool_call_id: %s", orphanID)
+				newMessages = append(newMessages, map[string]interface{}{
+					"role":         "tool",
+					"tool_call_id": orphanID,
+					"content":      "",
+				})
+			}
+		}
+	}
+
+	if !modified {
 		return bodyBytes, nil
 	}
 
-	req["messages"] = messages
+	req["messages"] = newMessages
 	return json.Marshal(req)
 }
 
