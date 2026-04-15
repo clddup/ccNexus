@@ -458,13 +458,14 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request) {
 			cleanedBody = transformedBody
 		}
 		transformedBody = cleanedBody
-		if config.NormalizeAuthMode(endpoint.AuthMode) == config.AuthModeCodexTokenPool {
-			transformedBody = overrideModelInPayload(transformedBody, endpoint.Model)
-		}
 
-		// Merge extra body JSON when configured
+		// Apply endpoint-level request overrides after transformation.
+		// ExtraBody can add/remove fields, but endpoint.Model should be the final winner.
 		if strings.TrimSpace(endpoint.ExtraBody) != "" {
 			transformedBody = mergeExtraBody(transformedBody, endpoint.ExtraBody)
+		}
+		if strings.TrimSpace(endpoint.Model) != "" {
+			transformedBody = overrideModelInPayload(transformedBody, endpoint.Model)
 		}
 
 		modelName := strings.TrimSpace(streamReq.Model)

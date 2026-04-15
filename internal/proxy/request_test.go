@@ -68,6 +68,23 @@ func TestOverrideModelInPayload(t *testing.T) {
 	}
 }
 
+func TestEndpointModelOverridesClientAndExtraBodyModel(t *testing.T) {
+	body := []byte(`{"model":"CCN","messages":[{"role":"user","content":"hi"}],"max_completion_tokens":256}`)
+	body = mergeExtraBody(body, `{"model":"from-extra-body","max_completion_tokens":null}`)
+	body = overrideModelInPayload(body, "gpt-5.4")
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if payload["model"] != "gpt-5.4" {
+		t.Fatalf("expected endpoint model gpt-5.4, got %#v", payload["model"])
+	}
+	if _, exists := payload["max_completion_tokens"]; exists {
+		t.Fatalf("expected max_completion_tokens removed by extra body, got %#v", payload["max_completion_tokens"])
+	}
+}
+
 func TestShouldHandleAsStreamingResponseForCodexWithoutContentType(t *testing.T) {
 	endpoint := config.Endpoint{
 		Name:        "TokenPool",
